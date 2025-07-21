@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>扫码登录 Bilibili</title>
+    <!-- 引入Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 引入Font Awesome -->
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    
+    <!-- 配置Tailwind自定义颜色和字体 -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#FB7299', // B站粉色
+                        secondary: '#23ADE5', // B站蓝色
+                        dark: '#18191C',
+                        light: '#F1F2F3'
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+    
+    <!-- 自定义工具类 -->
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .content-auto {
+                content-visibility: auto;
+            }
+            .glass {
+                background: rgba(255, 255, 255, 0.25);
+                backdrop-filter: blur(12px);
+                -webkit-backdrop-filter: blur(12px);
+                border: 1px solid rgba(255, 255, 255, 0.18);
+            }
+            .glass-dark {
+                background: rgba(24, 25, 28, 0.7);
+                backdrop-filter: blur(12px);
+                -webkit-backdrop-filter: blur(12px);
+                border: 1px solid rgba(255, 255, 255, 0.1);
+            }
+            .animate-pulse-slow {
+                animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+            }
+            .animate-float {
+                animation: float 6s ease-in-out infinite;
+            }
+            @keyframes float {
+                0%, 100% { transform: translateY(0); }
+                50% { transform: translateY(-10px); }
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen bg-gradient-to-br from-[#18191C] to-[#23ADE5] flex items-center justify-center p-4 overflow-hidden">
+    <!-- 装饰背景元素 -->
+    <div class="absolute top-1/4 -left-24 w-64 h-64 bg-primary/20 rounded-full blur-3xl animate-float"></div>
+    <div class="absolute bottom-1/4 -right-24 w-80 h-80 bg-secondary/20 rounded-full blur-3xl animate-float" style="animation-delay: -3s;"></div>
+    
+    <!-- 主容器 -->
+    <div class="glass-dark rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-md relative overflow-hidden transition-all duration-500">
+        <!-- 头部 -->
+        <div class="flex items-center justify-between mb-8">
+            <div class="flex items-center space-x-2">
+                <div class="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+                    <i class="fa fa-qrcode text-white text-xl"></i>
+                </div>
+                <h1 class="text-[clamp(1.25rem,3vw,1.75rem)] font-bold text-white">扫码登录</h1>
+            </div>
+            <div class="bg-primary/20 text-primary px-3 py-1 rounded-full text-sm font-medium">
+                Bilibili
+            </div>
+        </div>
+        
+        <!-- 二维码区域 -->
+        <div class="glass rounded-xl p-6 mb-6 text-center transition-all duration-500">
+            <div class="flex items-center justify-center h-64 mb-4">
+                <pre id="qrcode" class="font-mono text-[clamp(0.8rem,2vw,1rem)] text-white/90 leading-tight">正在加载二维码...</pre>
+            </div>
+            <div class="flex flex-col items-center">
+                <p id="status" class="text-white/80 mb-2 text-sm">等待二维码数据...</p>
+                <p class="text-white/60 text-xs">使用 Bilibili 客户端扫描二维码</p>
+            </div>
+        </div>
+        
+        <!-- 提示信息 -->
+        <div class="bg-white/10 rounded-lg p-4 text-white/80 text-sm">
+            <div class="flex items-start space-x-3">
+                <i class="fa fa-info-circle text-primary mt-1"></i>
+                <div>
+                    <p class="font-medium mb-1">安全提示</p>
+                    <p class="text-white/60 text-xs">请确保在安全的网络环境下进行登录操作，不要向他人泄露此二维码。</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 底部信息 -->
+        <div class="mt-8 text-center text-white/40 text-xs">
+            <p>© 2025 Bilibili 版权所有</p>
+        </div>
+    </div>
+
+    <script>
+        // 假设你的二维码数据接口为 http://localhost:5050/qrcode
+        async function fetchQRCode() {
+            try {
+                const res = await fetch('http://localhost:5050');  // 替换为你实际的地址
+                const text = await res.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(text, "text/html");
+                const qrText = doc.querySelector("pre")?.innerText || "无法加载二维码";
+
+                document.getElementById("qrcode").textContent = qrText;
+                document.getElementById("status").textContent = "请扫码登录";
+                
+                // 添加加载成功的动画效果
+                const qrcodeContainer = document.querySelector(".glass.rounded-xl");
+                qrcodeContainer.classList.add("shadow-lg", "shadow-primary/20");
+            } catch (e) {
+                document.getElementById("qrcode").textContent = "加载失败，请检查服务是否运行";
+                document.getElementById("status").textContent = "错误: " + e.message;
+                
+                // 添加错误状态的样式
+                const qrcodeContainer = document.querySelector(".glass.rounded-xl");
+                qrcodeContainer.classList.add("bg-red-500/10", "border-red-500/30");
+            }
+        }
+
+        async function checkLoginStatus() {
+            try {
+                const res = await fetch('http://localhost:5050/status');  // 替换为你实际的地址
+                const data = await res.json();
+                
+                const statusElement = document.getElementById("status");
+                if (data.status === "success") {
+                    statusElement.textContent = "登录成功！正在跳转...";
+                    
+                    // 添加登录成功的动画效果
+                    const qrcodeContainer = document.querySelector(".glass.rounded-xl");
+                    qrcodeContainer.classList.remove("bg-red-500/10", "border-red-500/30");
+                    qrcodeContainer.classList.add("bg-green-500/10", "border-green-500/30", "animate-pulse-slow");
+                    
+                    // 3秒后可以跳转或隐藏二维码区域
+                    setTimeout(() => {
+                        // 这里可以添加跳转逻辑
+                        // window.location.href = "https://www.bilibili.com";
+                    }, 3000);
+                } else {
+                    statusElement.textContent = "等待扫码...";
+                    
+                    // 移除错误状态的样式
+                    const qrcodeContainer = document.querySelector(".glass.rounded-xl");
+                    qrcodeContainer.classList.remove("bg-red-500/10", "border-red-500/30");
+                }
+            } catch (e) {
+                document.getElementById("status").textContent = "检查状态失败: " + e.message;
+            }
+        }
+
+        // 加载二维码并定时检查状态
+        fetchQRCode();
+        setInterval(checkLoginStatus, 3000);  // 每3秒检查一次状态
+    </script>
+</body>
+</html>
