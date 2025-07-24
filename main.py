@@ -1,96 +1,75 @@
+# main.py
 from bilibili_api import login_v2, sync
+from flask import Flask, jsonify, render_template, send_file
+import qrcode
+import io
+import base64
 import time
-import asyncio
-import webbrowser
-from http.server import BaseHTTPRequestHandler, HTTPServer
-import threading
-import json
-import os
 
-# 全局变量用于共享状态
-qr = None
-qrcode_data = "生成中..."
-login_done = False
-login_result = {}
+app = Flask(__name__, template_folder='templates')
+qr_login = None
+qr_url_cache = None
 
+@app.route('/')
+def index():
+    return render_template('index.html')
 
-# ========== 1. Web 服务处理 ==========
-class WebHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        global qrcode_data, login_done, login_result
+@app.route('/api/qrcode')
+async def get_qrcode():
+    global qr_login, qr_url_cache
+    qr_login = login_v2.QrCodeLogin(platform=login_v2.QrCodeLoginChannel.WEB)
+    qr_url = await qr_login.generate_qrcode()
+    qr_url_cache = qr_url
+    
+    # 生成二维码图像
+    qr_img = qrcode.make(qr_url)
+    img_buffer = io.BytesIO()
+    qr_img.save(img_buffer, format='PNG')
+    img_buffer.seek(0)
+    
+    # 保存图片到内存中，供/qrcode-image路由使用
+    app.qr_image_buffer = img_buffer
+    
+    # 返回base64编码
+    img_str = base64.b64encode(img_buffer.getvalue()).decode()
+    return jsonify({
+        'qrcode': f'data:image/png;base64,{img_str}',
+        'url': qr_url
+    })
 
-        if self.path == '/':
-            # 返回 HTML 页面
-            self.send_response(200)
-            self.send_header("Content-type", "text/html")
-            self.end_headers()
-            with open("qrcode.html", "rb") as f:
-                self.wfile.write(f.read())
+@app.route('/qrcode-image')
+async def qrcode_image():
+    global qr_login, qr_url_cache
+    if not qr_login:
+        qr_login = login_v2.QrCodeLogin(platform=login_v2.QrCodeLoginChannel.WEB)
+        qr_url = await qr_login.generate_qrcode()
+        qr_url_cache = qr_url
+    else:
+        qr_url = qr_url_cache
+    
+    # 生成二维码图像
+    qr_img = qrcode.make(qr_url)
+    img_buffer = io.BytesIO()
+    qr_img.save(img_buffer, format='PNG')
+    img_buffer.seek(0)
+    
+    return send_file(img_buffer, mimetype='image/png')
 
-        elif self.path == '/qrcode':
-            # 返回二维码文本
-            self.send_response(200)
-            self.send_header("Content-type", "text/plain")
-            self.end_headers()
-            self.wfile.write(qrcode_data.encode())
-
-        elif self.path == '/status':
-            # 返回登录状态
-            self.send_response(200)
-            self.send_header("Content-type", "application/json")
-            self.end_headers()
-            if login_done:
-                response = {"status": "success", "cookies": login_result.get("cookies")}
-            else:
-                response = {"status": "pending", "message": "等待扫码..."}
-            self.wfile.write(json.dumps(response).encode())
-
-        else:
-            self.send_error(404, "Not Found")
-
-
-def run_http_server():
-    server_address = ('', 5050)
-    httpd = HTTPServer(server_address, WebHandler)
-    print("🌐 HTTP 服务运行在 http://localhost:5050")
-    httpd.serve_forever()
-
-
-# ========== 2. 生成二维码并监听状态 ==========
-async def generate_qr_and_wait():
-    global qr, qrcode_data, login_done, login_result
-
-    try:
-        qr = login_v2.QrCodeLogin(platform=login_v2.QrCodeLoginChannel.WEB)
-        await qr.generate_qrcode()
-        qrcode_data = qr.get_qrcode_terminal()
-
-        while not qr.has_done():
-            state = await qr.check_state()
-            print(state)
-            time.sleep(1)
-
-        login_done = True
-        login_result = {
-            "cookies": qr.get_credential().get_cookies()
-        }
-        print("✅ 登录成功，Cookies:", login_result["cookies"])
-
-    except Exception as e:
-        print("❌ 发生错误:", str(e))
-        qrcode_data = "二维码生成失败，请检查网络或重试"
-
-
-# ========== 3. 主程序入口 ==========
-def main():
-    # 启动 Web 服务线程
-    server_thread = threading.Thread(target=run_http_server)
-    server_thread.daemon = True
-    server_thread.start()
-
-    # 异步执行二维码生成和等待
-    asyncio.run(generate_qr_and_wait())
-
+@app.route('/api/check_login')
+async def check_login():
+    global qr_login
+    if qr_login:
+        state = await qr_login.check_state()
+        if qr_login.has_done():
+            return jsonify({
+                'status': 'success',
+                'credential': qr_login.get_credential().get_cookies()
+            })
+        return jsonify({
+            'status': 'waiting',
+            'state': str(state)
+        })
+    return jsonify({'status': 'error', 'message': 'No QR code generated'})
 
 if __name__ == '__main__':
-    main()
+    app.run(host='0.0.0.0', port=5000, debug=True)
