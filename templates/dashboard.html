@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>B站直播数据仪表盘</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jquery/dist/jquery.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        :root {
+            --sidebar-bg: #2c3e50;
+            --sidebar-text: #ecf0f1;
+            --primary-color: #3498db;
+            --secondary-color: #2c3e50;
+            --accent-color: #e74c3c;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+            --info-color: #3498db;
+            --danger-color: #e74c3c;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            width: 250px;
+            background: var(--sidebar-bg);
+            color: var(--sidebar-text);
+            transition: all 0.3s;
+            z-index: 1000;
+            box-shadow: 3px 0 10px rgba(0,0,0,0.1);
+            overflow-y: auto;
+        }
+        
+        .sidebar-header {
+            padding: 20px 15px;
+            background: rgba(0,0,0,0.1);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .sidebar-header h3 {
+            margin: 0;
+            font-weight: 600;
+            font-size: 1.2rem;
+        }
+        
+        .sidebar-menu {
+            padding: 15px 0;
+        }
+        
+        .sidebar-menu .nav-link {
+            color: var(--sidebar-text);
+            padding: 12px 20px;
+            border-left: 3px solid transparent;
+            transition: all 0.3s;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+        }
+        
+        .sidebar-menu .nav-link:hover, 
+        .sidebar-menu .nav-link.active {
+            background: rgba(255,255,255,0.1);
+            border-left: 3px solid var(--primary-color);
+            color: white;
+        }
+        
+        .sidebar-menu .nav-link i {
+            margin-right: 10px;
+            width: 20px;
+            text-align: center;
+        }
+        
+        .main-content {
+            margin-left: 250px;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #3498db);
+            color: white;
+            padding: 20px;
+            margin-bottom: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .stat-card {
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            border: none;
+            transition: transform 0.3s, box-shadow 0.3s;
+            height: 100%;
+            margin-bottom: 20px;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+        
+        .stat-card .card-body {
+            padding: 20px;
+        }
+        
+        .stat-icon {
+            font-size: 2.5rem;
+            opacity: 0.8;
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 10px 0;
+        }
+        
+        .stat-title {
+            font-size: 1rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .card {
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            border: none;
+            margin-bottom: 20px;
+        }
+        
+        .card-header {
+            font-weight: 600;
+            padding: 15px 20px;
+            border-radius: 10px 10px 0 0 !important;
+        }
+        
+        .danmaku-item, .gift-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+            transition: all 0.2s;
+        }
+        
+        .danmaku-item:hover, .gift-item:hover {
+            background-color: #f8f9fa;
+        }
+        
+        .danmaku-content {
+            color: #3498db;
+            font-weight: 500;
+            margin-top: 5px;
+        }
+        
+        .gift-content {
+            color: #e74c3c;
+            font-weight: 500;
+            margin-top: 5px;
+        }
+        
+        .word-cloud-item {
+            display: inline-block;
+            margin: 5px;
+            padding: 8px 15px;
+            background: linear-gradient(135deg, #3498db, #2c3e50);
+            color: white;
+            border-radius: 30px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+            font-weight: 500;
+            transition: transform 0.2s;
+        }
+        
+        .word-cloud-item:hover {
+            transform: scale(1.05);
+        }
+        
+        .user-rank-row:nth-child(1) {
+            background-color: #fff9e6;
+            font-weight: 600;
+        }
+        
+        .user-rank-row:nth-child(2) {
+            background-color: #f0f8ff;
+        }
+        
+        .user-rank-row:nth-child(3) {
+            background-color: #fff0f0;
+        }
+        
+        .table th {
+            font-weight: 600;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #3498db, #2c3e50);
+            border: none;
+            padding: 10px 20px;
+            font-weight: 600;
+        }
+        
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #2980b9, #1a2530);
+        }
+        
+        .section {
+            display: none;
+        }
+        
+        .section.active {
+            display: block;
+        }
+        
+        .nav-section {
+            cursor: pointer;
+        }
+        
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 70px;
+            }
+            
+            .sidebar .sidebar-header h3 span, 
+            .sidebar-menu .nav-link span {
+                display: none;
+            }
+            
+            .sidebar .sidebar-header h3::before,
+            .sidebar-menu .nav-link i {
+                margin-right: 0;
+            }
+            
+            .main-content {
+                margin-left: 70px;
+            }
+            
+            .stat-number {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 侧边栏 -->
+    <div class="sidebar">
+        <div class="sidebar-header">
+            <h3><i class="bi bi-bar-chart-fill me-2"></i> <span>B站数据仪表盘</span></h3>
+        </div>
+        <div class="sidebar-menu">
+            <ul class="nav flex-column">
+                <li class="nav-item">
+                    <a class="nav-link" href="/">
+                        <i class="bi bi-box-arrow-in-right"></i> <span>返回登录</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link nav-section active" data-section="overview">
+                        <i class="bi bi-speedometer2"></i> <span>数据总览</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link nav-section" data-section="realtime">
+                        <i class="bi bi-clock-history"></i> <span>实时数据</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link nav-section" data-section="rankings">
+                        <i class="bi bi-award"></i> <span>排行榜</span>
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link nav-section" data-section="analytics">
+                        <i class="bi bi-graph-up"></i> <span>数据分析</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- 主内容 -->
+    <div class="main-content">
+        <div class="header">
+            <div class="container-fluid">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h1><i class="bi bi-bar-chart-line me-2"></i>B站直播数据仪表盘</h1>
+                    <div>
+                        <a href="/" class="btn btn-light"><i class="bi bi-arrow-left-circle me-1"></i>重新登录</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="container-fluid">
+            <!-- 控制面板 -->
+            <div class="row mb-4">
+                <div class="col-md-8 mx-auto">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="roomId" placeholder="输入直播间ID，例如：1878687045">
+                                <button class="btn btn-primary" type="button" id="startBtn"><i class="bi bi-play-circle me-1"></i>开始监控</button>
+                            </div>
+                            <div class="form-text mt-2"><i class="bi bi-info-circle me-1"></i>输入B站直播间的ID开始监控实时数据</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 数据总览部分 -->
+            <div id="overview" class="section active">
+                <div class="row mb-4" id="statsOverview">
+                    <div class="col-md-3">
+                        <div class="card stat-card bg-primary text-white">
+                            <div class="card-body text-center">
+                                <div class="stat-icon">
+                                    <i class="bi bi-chat-text"></i>
+                                </div>
+                                <div class="stat-number" id="totalDanmaku">0</div>
+                                <div class="stat-title">弹幕总数</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card stat-card bg-success text-white">
+                            <div class="card-body text-center">
+                                <div class="stat-icon">
+                                    <i class="bi bi-gift"></i>
+                                </div>
+                                <div class="stat-number" id="totalGifts">0</div>
+                                <div class="stat-title">礼物总数</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card stat-card bg-warning text-white">
+                            <div class="card-body text-center">
+                                <div class="stat-icon">
+                                    <i class="bi bi-people"></i>
+                                </div>
+                                <div class="stat-number" id="totalUsers">0</div>
+                                <div class="stat-title">用户数</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card stat-card bg-danger text-white">
+                            <div class="card-body text-center">
+                                <div class="stat-icon">
+                                    <i class="bi bi-coin"></i>
+                                </div>
+                                <div class="stat-number" id="totalCoins">0</div>
+                                <div class="stat-title">总金瓜子</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-header bg-info text-white">
+                                <i class="bi bi-graph-up me-1"></i>数据趋势
+                            </div>
+                            <div class="card-body p-0" style="height: 400px;">
+                                <div id="lineChart" style="height: 100%;"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 实时数据部分 -->
+            <div id="realtime" class="section">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-primary text-white">
+                                <i class="bi bi-chat-dots me-1"></i>实时弹幕
+                            </div>
+                            <div class="card-body p-0" id="danmakuList" style="height: 500px; overflow-y: auto;">
+                                <!-- 弹幕将在这里显示 -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-success text-white">
+                                <i class="bi bi-gift-fill me-1"></i>实时礼物
+                            </div>
+                            <div class="card-body p-0" id="giftList" style="height: 500px; overflow-y: auto;">
+                                <!-- 礼物将在这里显示 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 排行榜部分 -->
+            <div id="rankings" class="section">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-warning text-white">
+                                <i class="bi bi-award me-1"></i>活跃用户排行榜
+                            </div>
+                            <div class="card-body p-0">
+                                <div style="max-height: 500px; overflow-y: auto;">
+                                    <table class="table table-hover mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>排名</th>
+                                                <th>用户名</th>
+                                                <th>弹幕数</th>
+                                                <th>礼物数</th>
+                                                <th>金瓜子</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="userRanking">
+                                            <!-- 用户排行将在这里显示 -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header bg-danger text-white">
+                                <i class="bi bi-trophy me-1"></i>礼物排行榜
+                            </div>
+                            <div class="card-body p-0">
+                                <div style="max-height: 500px; overflow-y: auto;">
+                                    <table class="table table-hover mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>排名</th>
+                                                <th>礼物名称</th>
+                                                <th>数量</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="giftRanking">
+                                            <!-- 礼物排行将在这里显示 -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 数据分析部分 -->
+            <div id="analytics" class="section">
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="card">
+                            <div class="card-header bg-secondary text-white">
+                                <i class="bi bi-cloud-fill me-1"></i>弹幕热词云
+                            </div>
+                            <div class="card-body" id="wordCloud" style="height: 500px; overflow-y: auto;">
+                                <!-- 词云将在这里显示 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let lineChart = null;
+        let updateInterval = null;
+        
+        // 初始化图表
+        function initCharts() {
+            const chartDom = document.getElementById('lineChart');
+            lineChart = echarts.init(chartDom);
+        }
+        
+        // 更新折线图
+        function updateLineChart(chartData) {
+            const option = {
+                tooltip: {
+                    trigger: 'axis'
+                },
+                legend: {
+                    data: ['弹幕数', '礼物数', '金瓜子'],
+                    top: '5%'
+                },
+                grid: {
+                    left: '3%',
+                    right: '4%',
+                    bottom: '3%',
+                    containLabel: true
+                },
+                xAxis: {
+                    type: 'category',
+                    data: chartData.hours
+                },
+                yAxis: {
+                    type: 'value'
+                },
+                series: [
+                    {
+                        name: '弹幕数',
+                        type: 'line',
+                        data: chartData.danmaku_counts,
+                        smooth: true,
+                        itemStyle: { color: '#3498db' }
+                    },
+                    {
+                        name: '礼物数',
+                        type: 'line',
+                        data: chartData.gift_counts,
+                        smooth: true,
+                        itemStyle: { color: '#e74c3c' }
+                    },
+                    {
+                        name: '金瓜子',
+                        type: 'line',
+                        data: chartData.coin_values,
+                        smooth: true,
+                        itemStyle: { color: '#f39c12' }
+                    }
+                ]
+            };
+            
+            lineChart.setOption(option, true);
+        }
+        
+        // 更新统计概览
+        function updateStats(stats) {
+            $('#totalDanmaku').text(stats.danmaku_count);
+            $('#totalGifts').text(stats.gift_count);
+            $('#totalUsers').text(stats.user_count);
+            $('#totalCoins').text(stats.total_coin);
+        }
+        
+        // 更新弹幕列表
+        function updateDanmakuList(danmakus) {
+            const container = $('#danmakuList');
+            container.empty();
+            
+            if (danmakus.length === 0) {
+                container.html('<div class="text-center p-3 text-muted"><i class="bi bi-chat-dots me-1"></i>暂无弹幕</div>');
+                return;
+            }
+            
+            danmakus.slice().reverse().forEach(danmaku => {
+                const item = $(`
+                    <div class="danmaku-item">
+                        <div class="d-flex justify-content-between">
+                            <strong class="text-primary">${danmaku.username}</strong>
+                            <small class="text-muted"><i class="bi bi-clock me-1"></i>${danmaku.time_str}</small>
+                        </div>
+                        <div class="danmaku-content mt-1">${danmaku.content}</div>
+                    </div>
+                `);
+                container.append(item);
+            });
+        }
+        
+        // 更新礼物列表
+        function updateGiftList(gifts) {
+            const container = $('#giftList');
+            container.empty();
+            
+            if (gifts.length === 0) {
+                container.html('<div class="text-center p-3 text-muted"><i class="bi bi-gift me-1"></i>暂无礼物</div>');
+                return;
+            }
+            
+            gifts.slice().reverse().forEach(gift => {
+                const item = $(`
+                    <div class="gift-item">
+                        <div class="d-flex justify-content-between">
+                            <strong class="text-success">${gift.username}</strong>
+                            <small class="text-muted"><i class="bi bi-clock me-1"></i>${gift.time_str}</small>
+                        </div>
+                        <div class="gift-content mt-1">${gift.gift_name} × ${gift.gift_num} <span class="badge bg-danger"><i class="bi bi-coin me-1"></i>金瓜子: ${gift.total_coin}</span></div>
+                    </div>
+                `);
+                container.append(item);
+            });
+        }
+        
+        // 更新用户排行榜
+        function updateUserRanking(users) {
+            const container = $('#userRanking');
+            container.empty();
+            
+            if (users.length === 0) {
+                container.html('<tr><td colspan="5" class="text-center text-muted"><i class="bi bi-person-x me-1"></i>暂无用户数据</td></tr>');
+                return;
+            }
+            
+            users.forEach((user, index) => {
+                const row = $(`
+                    <tr class="user-rank-row">
+                        <td><strong>#${index + 1}</strong></td>
+                        <td>${user.username}</td>
+                        <td>${user.danmaku_count}</td>
+                        <td>${user.gift_count}</td>
+                        <td>${user.total_coin}</td>
+                    </tr>
+                `);
+                container.append(row);
+            });
+        }
+        
+        // 更新礼物排行榜
+        function updateGiftRanking(gifts) {
+            const container = $('#giftRanking');
+            container.empty();
+            
+            if (gifts.length === 0) {
+                container.html('<tr><td colspan="3" class="text-center text-muted"><i class="bi bi-gift me-1"></i>暂无礼物数据</td></tr>');
+                return;
+            }
+            
+            gifts.forEach((gift, index) => {
+                const row = $(`
+                    <tr>
+                        <td><strong>#${index + 1}</strong></td>
+                        <td>${gift.gift_name}</td>
+                        <td>${gift.count}</td>
+                    </tr>
+                `);
+                container.append(row);
+            });
+        }
+        
+        // 更新词云
+        function updateWordCloud(words) {
+            const container = $('#wordCloud');
+            container.empty();
+            
+            if (words.length === 0) {
+                container.html('<div class="text-center text-muted py-5"><i class="bi bi-cloud me-1"></i>暂无热词</div>');
+                return;
+            }
+            
+            words.forEach(word => {
+                // 根据词频调整字体大小
+                const fontSize = Math.max(14, Math.min(32, 12 + word.count / 2));
+                const opacity = Math.min(1, 0.5 + word.count / 20);
+                
+                const item = $(`
+                    <span class="word-cloud-item" style="font-size: ${fontSize}px; opacity: ${opacity};">
+                        ${word.word}
+                    </span>
+                `);
+                container.append(item);
+            });
+        }
+        
+        // 获取并更新所有数据
+        function updateAllData() {
+            $.get('/api/data', function(data) {
+                updateStats(data.total_stats);
+                updateDanmakuList(data.recent_danmakus);
+                updateGiftList(data.recent_gifts);
+                updateUserRanking(data.top_users);
+                updateGiftRanking(data.top_gifts);
+                updateWordCloud(data.top_words);
+                updateLineChart(data.chart_data);
+            }).fail(function() {
+                console.error("获取数据失败");
+            });
+        }
+        
+        // 启动监控
+        $('#startBtn').click(function() {
+            const roomId = $('#roomId').val();
+            if (!roomId) {
+                alert('请输入直播间ID');
+                return;
+            }
+            
+            $.get(`/api/start/${roomId}`, function(response) {
+                if (response.status === 'started') {
+                    alert('已开始监控直播间');
+                    // 开始定期更新数据
+                    if (updateInterval) {
+                        clearInterval(updateInterval);
+                    }
+                    updateInterval = setInterval(updateAllData, 3000);
+                } else if (response.status === 'already_running') {
+                    alert('监控已在运行中');
+                    if (!updateInterval) {
+                        updateInterval = setInterval(updateAllData, 3000);
+                    }
+                } else {
+                    alert('启动失败: ' + response.message);
+                }
+            }).fail(function() {
+                alert('启动监控失败，请检查网络连接或直播间ID是否正确');
+            });
+        });
+        
+        // 侧边栏导航
+        $('.nav-section').click(function(e) {
+            e.preventDefault();
+            $('.nav-section').removeClass('active');
+            $(this).addClass('active');
+            
+            $('.section').removeClass('active');
+            const sectionId = $(this).data('section');
+            $('#' + sectionId).addClass('active');
+        });
+        
+        // 页面加载完成后初始化
+        $(document).ready(function() {
+            initCharts();
+            $(window).on('resize', function() {
+                if (lineChart) {
+                    lineChart.resize();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
